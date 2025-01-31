@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { fetchTasks } from '../../entities/task/case/get-tasks/use-case';
 import TaskForm from '../../features/task-form';
 import CustomDatePicker from '../../shared/components/Date/DatePicker';
-import { ITask, createTask, updateTask, deleteTask as deleteTaskFromStorage } from '../../entities/task/slice';
+import { ITask, updateTask, deleteTask as deleteTaskFromStorage } from '../../entities/task/slice';
 
 const HomePage: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState(new Date('2025-01-30'));
