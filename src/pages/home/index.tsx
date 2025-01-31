@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { fetchTasks } from '../../entities/task/case/get-tasks/use-case';
 import TaskForm from '../../features/task-form';
 import CustomDatePicker from '../../shared/components/Date/DatePicker';
-import { ITask } from '../../entities/task/slice';
+import { ITask, createTask, updateTask, deleteTask as deleteTaskFromStorage } from '../../entities/task/slice';
 
 const HomePage: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState(new Date('2025-01-30'));
@@ -17,7 +17,7 @@ const HomePage: React.FC = () => {
   const [editText, setEditText] = useState('');
 
   const loadTasksFromLocalStorage = () => {
-    const storedTasks = JSON.parse(localStorage.getItem('tasks') || '{}');
+    const storedTasks = JSON.parse(localStorage.getItem('tasks') || '[]');
     setLocalTasks(storedTasks[formattedDate] || []);
   };
 
@@ -34,23 +34,17 @@ const HomePage: React.FC = () => {
   const tasks = localTasks.length > 0 ? localTasks : fetchedTasks;
   const filteredTasks = activeTab === 'completed' ? tasks.filter(task => task.completed) : tasks;
 
-  const updateLocalStorage = (updatedTasks: ITask[]) => {
-    const storedTasks = JSON.parse(localStorage.getItem('tasks') || '{}');
-    storedTasks[formattedDate] = updatedTasks;
-    localStorage.setItem('tasks', JSON.stringify(storedTasks));
-    setLocalTasks(updatedTasks);
-  };
-
   const toggleTaskCompletion = (taskId: number) => {
     const updatedTasks = localTasks.map(task =>
       task.id === taskId ? { ...task, completed: !task.completed } : task
     );
-    updateLocalStorage(updatedTasks);
+    updateTask(updatedTasks.find(task => task.id === taskId)!);
+    loadTasksFromLocalStorage();
   };
 
   const deleteTask = (taskId: number) => {
-    const updatedTasks = localTasks.filter(task => task.id !== taskId);
-    updateLocalStorage(updatedTasks);
+    deleteTaskFromStorage(formattedDate, taskId);
+    loadTasksFromLocalStorage();
   };
 
   const openEditModal = (task: ITask) => {
@@ -69,19 +63,28 @@ const HomePage: React.FC = () => {
 
   const handleSave = () => {
     if (editTaskId !== null) {
-      const updatedTasks = localTasks.map(task =>
-        task.id === editTaskId ? { ...task, title: editTitle, text: editText } : task
-      );
-      updateLocalStorage(updatedTasks);
+      const updatedTask: ITask = {
+        id: editTaskId,
+        title: editTitle,
+        text: editText,
+        completed: localTasks.find(task => task.id === editTaskId)?.completed || false,
+        date: formattedDate
+      };
+
+      updateTask(updatedTask);
+      loadTasksFromLocalStorage();
       closeModal();
     }
   };
 
   return (
     <div className="max-w-4xl mx-auto p-4">
-      <h1 className="text-3xl font-bold text-center mb-4">Tasks for {formattedDate}</h1>
+      <h1 className="text-3xl font-bold text-center mb-4">Задачи на {formattedDate}</h1>
       <div className="text-center mb-4">
-        <CustomDatePicker selectedDate={selectedDate} onChange={setSelectedDate} />
+      <CustomDatePicker 
+        selectedDate={selectedDate} 
+        onChange={(date) => setSelectedDate(date ?? new Date())} 
+      />
       </div>
 
       {/* Переключение вкладок */}
@@ -90,22 +93,22 @@ const HomePage: React.FC = () => {
           className={`px-4 py-2 transition-colors rounded ${activeTab === 'all' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
           onClick={() => setActiveTab('all')}
         >
-          All Tasks
+          Все задачи
         </button>
         <button
           className={`px-4 py-2 transition-colors rounded ${activeTab === 'completed' ? 'bg-green-500 text-white' : 'bg-gray-200'}`}
           onClick={() => setActiveTab('completed')}
         >
-          Completed Tasks
+          Завершенные
         </button>
       </div>
 
       <TaskForm date={formattedDate} onTaskAdded={loadTasksFromLocalStorage} />
 
       {isLoading ? (
-        <div className="text-center mt-4">Loading...</div>
+        <div className="text-center mt-4">Загрузка...</div>
       ) : filteredTasks.length === 0 ? (
-        <div className="text-center mt-4">No tasks found for {formattedDate}</div>
+        <div className="text-center mt-4">Задачи на {formattedDate} не найдены.</div>
       ) : (
         <ul className="mt-6 space-y-4">
           {filteredTasks.map((task: ITask) => (
@@ -130,13 +133,13 @@ const HomePage: React.FC = () => {
                   onClick={() => openEditModal(task)}
                   className="bg-blue-400 hover:bg-blue-500 transition-colors text-white px-2 py-1 rounded"
                 >
-                  Edit
+                  Редактирование
                 </button>
                 <button
                   onClick={() => deleteTask(task.id)}
                   className="bg-red-400 hover:bg-red-500 transition-colors text-white px-2 py-1 rounded"
                 >
-                  Delete
+                  Удаление
                 </button>
               </div>
             </li>
@@ -144,11 +147,10 @@ const HomePage: React.FC = () => {
         </ul>
       )}
 
-
       {isModalOpen && (
-        <div className="fixed inset-0 flex items-center  justify-center bg-opacity-50">
+        <div className="fixed inset-0 flex items-center justify-center bg-opacity-50">
           <div className="bg-white p-6 rounded shadow-lg">
-            <h2 className="text-lg font-bold mb-4">Edit Task</h2>
+            <h2 className="text-lg font-bold mb-4">Редактирование задачи</h2>
             <input
               type="text"
               value={editTitle}
@@ -163,8 +165,8 @@ const HomePage: React.FC = () => {
               placeholder="Description"
             />
             <div className="flex justify-end space-x-2">
-              <button onClick={closeModal} className="px-4 py-2 transition-colors bg-gray-300 rounded">Cancel</button>
-              <button onClick={handleSave} className="px-4 py-2 transition-colors bg-blue-500 text-white rounded">Save</button>
+              <button onClick={closeModal} className="px-4 py-2 transition-colors bg-gray-300 rounded">Отмена</button>
+              <button onClick={handleSave} className="px-4 py-2 transition-colors bg-blue-500 text-white rounded">Сохранить</button>
             </div>
           </div>
         </div>

@@ -26,12 +26,12 @@ const TaskForm: React.FC<{ date: string; onTaskAdded: () => void }> = ({ date, o
     <form onSubmit={handleSubmit} className="bg-white p-4 rounded-md shadow-md">
       <div className="mb-4">
         <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="title">
-          Title
+          Название
         </label>
         <Input
           id="title"
           type="text"
-          placeholder="Title"
+          placeholder="Название"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           required
@@ -39,11 +39,11 @@ const TaskForm: React.FC<{ date: string; onTaskAdded: () => void }> = ({ date, o
       </div>
       <div className="mb-4">
         <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="text">
-          Description
+          Текст
         </label>
         <textarea
           id="text"
-          placeholder="Text"
+          placeholder="Текст"
           value={text}
           onChange={(e) => setText(e.target.value)}
           required
@@ -54,7 +54,7 @@ const TaskForm: React.FC<{ date: string; onTaskAdded: () => void }> = ({ date, o
         type="submit"
         className="bg-green-400 hover:bg-green-500 text-white font-bold py-2 px-4 transition-colors rounded focus:outline-none focus:shadow-outline"
       >
-        Add Task
+        Добавить задачу
       </button>
     </form>
   );

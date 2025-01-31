@@ -1,4 +1,3 @@
-// src/entities/task/case/update-task/presenter/index.ts
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { updateExistingTask } from '../use-case';
 
