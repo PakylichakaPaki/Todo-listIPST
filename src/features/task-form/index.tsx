@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import { useState, FC } from 'react';
 import Input from '../../shared/components/input';
 import { ITask } from '../../entities/task/slice';
 
-const TaskForm: React.FC<{ date: string; onTaskAdded: () => void }> = ({ date, onTaskAdded }) => {
+const TaskForm: FC<{ date: string; onTaskAdded: () => void }> = ({ date, onTaskAdded }) => {
   const [title, setTitle] = useState('');
   const [text, setText] = useState('');
 
@@ -11,11 +11,11 @@ const TaskForm: React.FC<{ date: string; onTaskAdded: () => void }> = ({ date, o
     const newTask: ITask = { id: Date.now(), title, text, completed: false, date };
 
     // Сохранение в localStorage
-    const localTasks = JSON.parse(localStorage.getItem('tasks') || '{}');
+    const localTasks = JSON.parse(localStorage.getItem('tasks') || '[]');
     const updatedTasks = localTasks[date] ? [...localTasks[date], newTask] : [newTask];
     localTasks[date] = updatedTasks;
     localStorage.setItem('tasks', JSON.stringify(localTasks));
-
+    console.log('Список всех задач:', localTasks);
     onTaskAdded();
 
     setTitle('');

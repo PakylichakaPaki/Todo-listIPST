@@ -1,51 +1,33 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchTasks } from '../../entities/task/case/get-tasks/use-case';
 import TaskForm from '../../features/task-form';
 import CustomDatePicker from '../../shared/components/Date/DatePicker';
-import { ITask, updateTask, deleteTask as deleteTaskFromStorage } from '../../entities/task/slice';
+import { ITask, updateTask } from '../../entities/task/slice';
+import { useUpdateTask } from '../../entities/task/case/update-task/presenter';
+import { EditTaskModal } from '../../features/edit-task-modal';
+import { useDeleteTask } from '../../entities/task/case/delete-task/presenter';
 
 const HomePage: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState(new Date('2025-01-30'));
   const formattedDate = selectedDate.toISOString().split('T')[0];
-  const [localTasks, setLocalTasks] = useState<ITask[]>([]);
   const [activeTab, setActiveTab] = useState<'all' | 'completed'>('all');
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editTaskId, setEditTaskId] = useState<number | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [editText, setEditText] = useState('');
+  const {toggleTaskCompletion} = useUpdateTask();
+  const deleteTaskMutation = useDeleteTask();
 
-  const loadTasksFromLocalStorage = () => {
-    const storedTasks = JSON.parse(localStorage.getItem('tasks') || '[]');
-    setLocalTasks(storedTasks[formattedDate] || []);
-  };
-
-  useEffect(() => {
-    loadTasksFromLocalStorage();
-  }, [formattedDate]);
-
-  const { data: fetchedTasks = [], isLoading } = useQuery<ITask[]>({
+  const { data: tasks = [], isLoading } = useQuery<ITask[]>({
     queryKey: ['tasks', formattedDate],
     queryFn: () => fetchTasks(formattedDate),
-    enabled: localTasks.length === 0,
   });
 
-  const tasks = localTasks.length > 0 ? localTasks : fetchedTasks;
-  const filteredTasks = activeTab === 'completed' ? tasks.filter(task => task.completed) : tasks;
-
-  const toggleTaskCompletion = (taskId: number) => {
-    const updatedTasks = localTasks.map(task =>
-      task.id === taskId ? { ...task, completed: !task.completed } : task
-    );
-    updateTask(updatedTasks.find(task => task.id === taskId)!);
-    loadTasksFromLocalStorage();
-  };
-
-  const deleteTask = (taskId: number) => {
-    deleteTaskFromStorage(formattedDate, taskId);
-    loadTasksFromLocalStorage();
-  };
+  const filteredTasks = activeTab === 'completed' 
+    ? tasks.filter(task => task.completed) 
+    : tasks;
 
   const openEditModal = (task: ITask) => {
     setEditTaskId(task.id);
@@ -61,20 +43,21 @@ const HomePage: React.FC = () => {
     setEditText('');
   };
 
-  const handleSave = () => {
+  const handleSave = (editedTask: Pick<ITask, 'title' | 'text'>) => {
     if (editTaskId !== null) {
       const updatedTask: ITask = {
         id: editTaskId,
-        title: editTitle,
-        text: editText,
-        completed: localTasks.find(task => task.id === editTaskId)?.completed || false,
+        ...editedTask,
+        completed: tasks.find(task => task.id === editTaskId)?.completed || false,
         date: formattedDate
       };
-
       updateTask(updatedTask);
-      loadTasksFromLocalStorage();
       closeModal();
     }
+  };
+
+  const handleDelete = (taskId: number) => {
+    deleteTaskMutation.mutate({ date: formattedDate, taskId });
   };
 
   return (
@@ -103,7 +86,7 @@ const HomePage: React.FC = () => {
         </button>
       </div>
 
-      <TaskForm date={formattedDate} onTaskAdded={loadTasksFromLocalStorage} />
+      <TaskForm date={formattedDate} onTaskAdded={() => {}} />
 
       {isLoading ? (
         <div className="text-center mt-4">Загрузка...</div>
@@ -117,15 +100,24 @@ const HomePage: React.FC = () => {
               className={`p-4 rounded-md shadow-md flex justify-between items-center ${task.completed ? 'bg-green-100' : 'bg-white'}`}
             >
               <div className="flex items-center">
-                <input
-                  type="checkbox"
-                  checked={task.completed}
-                  onChange={() => toggleTaskCompletion(task.id)}
-                  className="mr-2"
-                />
-                <div>
-                  <h2 className="text-xl font-semibold">{task.title}</h2>
-                  <p>{task.text}</p>
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={task.completed}
+                    onChange={() => toggleTaskCompletion(task.id)}
+                    className="mr-2"
+                    id={`task-${task.id}`}
+                    aria-label={`Отметить выполнение задачи ${task.title}`}
+                  />
+                  <label 
+                    htmlFor={`task-${task.id}`}
+                    className="flex items-center cursor-pointer"
+                  >
+                    <div>
+                      <h2 className="text-xl font-semibold">{task.title}</h2>
+                      <p>{task.text}</p>
+                    </div>
+                  </label>
                 </div>
               </div>
               <div className="space-x-2">
@@ -136,7 +128,7 @@ const HomePage: React.FC = () => {
                   Редактирование
                 </button>
                 <button
-                  onClick={() => deleteTask(task.id)}
+                  onClick={() => handleDelete(task.id)}
                   className="bg-red-400 hover:bg-red-500 transition-colors text-white px-2 py-1 rounded"
                 >
                   Удаление
@@ -147,30 +139,16 @@ const HomePage: React.FC = () => {
         </ul>
       )}
 
-      {isModalOpen && (
-        <div className="fixed inset-0 flex items-center justify-center bg-opacity-50">
-          <div className="bg-white p-6 rounded shadow-lg">
-            <h2 className="text-lg font-bold mb-4">Редактирование задачи</h2>
-            <input
-              type="text"
-              value={editTitle}
-              onChange={e => setEditTitle(e.target.value)}
-              className="border p-2 w-full mb-2"
-              placeholder="Title"
-            />
-            <textarea
-              value={editText}
-              onChange={e => setEditText(e.target.value)}
-              className="border p-2 w-full mb-4"
-              placeholder="Description"
-            />
-            <div className="flex justify-end space-x-2">
-              <button onClick={closeModal} className="px-4 py-2 transition-colors bg-gray-300 rounded">Отмена</button>
-              <button onClick={handleSave} className="px-4 py-2 transition-colors bg-blue-500 text-white rounded">Сохранить</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <EditTaskModal
+        isOpen={isModalOpen}
+        task={{ title: editTitle, text: editText }}
+        onClose={closeModal}
+        onSave={handleSave}
+        onChange={{
+          title: setEditTitle,
+          text: setEditText
+        }}
+      />
     </div>
   );
 };
